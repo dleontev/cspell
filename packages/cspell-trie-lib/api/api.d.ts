@@ -306,6 +306,8 @@ interface SuggestionResultBase {
 interface SuggestionResult extends SuggestionResultBase {
   /** The suggested word with compound marks, generally a `•` */
   compoundWord?: string | undefined;
+  /** The locale of the dictionary that supplied the suggestion, when declared. */
+  dictionaryLocale?: string | undefined;
 }
 interface Progress {
   type: "progress";
@@ -335,12 +337,14 @@ interface SuggestionCollector {
    * @param src - the SuggestionIterator used to generate suggestions.
    * @param timeout - the amount of time in milliseconds to allow for suggestions.
    * before sending `symbolStopProcessing`
+   * @param filter - an optional filter for this source.
+   * @param dictionaryLocale - the locale of the source dictionary, if known.
    * Iterator implementation:
    * @example
    * r = yield(suggestion);
    * if (r === collector.symbolStopProcessing) // ...stop generating suggestions.
    */
-  collect: (src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn) => void;
+  collect: (src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn, dictionaryLocale?: string) => void;
   add: (suggestion: SuggestionResultBase) => SuggestionCollector;
   readonly suggestions: SuggestionResult[];
   readonly changeLimit: number;
@@ -399,9 +403,10 @@ export declare function suggestionCollector(wordToMatch: string, options: Sugges
  * The collection is still in the original collector.
  * @param collector - collector to impersonate
  * @param word - word to present instead of `collector.word`.
+ * @param dictionaryLocale - the locale of the source dictionary, if known.
  * @returns a SuggestionCollector
  */
-export declare function impersonateCollector(collector: SuggestionCollector, word: string): SuggestionCollector;
+export declare function impersonateCollector(collector: SuggestionCollector, word: string, dictionaryLocale?: string): SuggestionCollector;
 interface TrieDataFundamentals {
   readonly info: Readonly<TrieInfo>;
 }

@@ -228,6 +228,14 @@ describe('Verify dictionaries with a locale', () => {
         expect(dict.has(word, { ignoreCase })).toBe(expected);
     });
 
+    // cspell:ignore İNCELEMEE
+    test.each([true, false])('uses the dictionary locale when finding suggestions, ignoreCase: %s', (ignoreCase) => {
+        const dict = createSpellingDictionary(trWords, 'tr-test', 'test', opts({ locale: 'tr-TR' }));
+        const suggestions = dict.suggest('İNCELEMEE', { ignoreCase, numChanges: 1 });
+
+        expect(suggestions.map(({ word }) => word)).toContain('inceleme');
+    });
+
     test.each`
         word          | ignoreCase | expected
         ${'İnceleme'} | ${true}    | ${false}

@@ -18,6 +18,9 @@ export interface SuggestionResultBase {
 export interface SuggestionResult extends SuggestionResultBase {
     /** The suggested word with compound marks, generally a `•` */
     compoundWord?: string | undefined;
+
+    /** The locale of the dictionary that supplied the suggestion, when declared. */
+    dictionaryLocale?: string | undefined;
 }
 
 export interface Progress {

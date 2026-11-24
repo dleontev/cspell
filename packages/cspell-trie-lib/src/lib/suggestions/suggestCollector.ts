@@ -53,12 +53,14 @@ export interface SuggestionCollector {
      * @param src - the SuggestionIterator used to generate suggestions.
      * @param timeout - the amount of time in milliseconds to allow for suggestions.
      * before sending `symbolStopProcessing`
+     * @param filter - an optional filter for this source.
+     * @param dictionaryLocale - the locale of the source dictionary, if known.
      * Iterator implementation:
      * @example
      * r = yield(suggestion);
      * if (r === collector.symbolStopProcessing) // ...stop generating suggestions.
      */
-    collect: (src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn) => void;
+    collect: (src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn, dictionaryLocale?: string) => void;
     add: (suggestion: SuggestionResultBase) => SuggestionCollector;
     readonly suggestions: SuggestionResult[];
     readonly changeLimit: number;
@@ -146,7 +148,7 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
 
     const numSuggestions = Math.max(options.numSuggestions, 0) || 0;
     const numSugToHold = weightMap ? numSuggestions * 2 : numSuggestions;
-    const sugs = new Map<string, SuggestionResultBase>();
+    const sugs = new Map<string, SuggestionResult>();
     let maxCost: number = BASE_COST * Math.min(wordToMatch.length * MAX_ALLOWED_COST_SCALE, changeLimit);
     const useSeparator =
         compoundSeparator ||
@@ -193,15 +195,22 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
         return { word: sug.word, cost: sug.cost + extraCost };
     }
 
-    function collectSuggestion(suggestion: SuggestionResultBase): MaxCost {
+    function collectSuggestion(suggestion: SuggestionResultBase, dictionaryLocale?: string): MaxCost {
         const { word, cost, isPreferred } = adjustCost(suggestion);
         if (cost <= maxCost && filter(suggestion.word, cost)) {
             const known = sugs.get(word);
             if (known) {
-                known.cost = Math.min(known.cost, cost);
+                if (cost < known.cost) {
+                    known.cost = cost;
+                    if (dictionaryLocale) known.dictionaryLocale = dictionaryLocale;
+                    else delete known.dictionaryLocale;
+                }
                 known.isPreferred = known.isPreferred || isPreferred;
             } else {
-                sugs.set(word, { word, cost, isPreferred });
+                sugs.set(
+                    word,
+                    dictionaryLocale ? { word, cost, isPreferred, dictionaryLocale } : { word, cost, isPreferred },
+                );
                 if (cost < maxCost && sugs.size > numSugToHold) {
                     dropMax();
                 }
@@ -215,7 +224,7 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
      * @param src - the SuggestionIterator used to generate suggestions.
      * @param timeout - the amount of time in milliseconds to allow for suggestions.
      */
-    function collect(src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn) {
+    function collect(src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn, dictionaryLocale?: string) {
         let stop: false | symbol = false;
         timeout = timeout ?? timeRemaining;
         timeout = Math.min(timeout, timeRemaining);
@@ -232,7 +241,7 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
             if (!value) continue;
             if (isSuggestionResult(value)) {
                 if (!filter || filter(value.word, value.cost)) {
-                    collectSuggestion(value);
+                    collectSuggestion(value, dictionaryLocale);
                 }
                 continue;
             }
@@ -241,13 +250,13 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
         timeRemaining -= timer();
     }
 
-    function cleanCompoundResult(sr: SuggestionResultBase): SuggestionResult {
-        const { word, cost } = sr;
+    function cleanCompoundResult(sr: SuggestionResult): SuggestionResult {
+        const { word } = sr;
         const cWord = fnCleanWord(word);
         if (cWord !== word) {
             return {
+                ...sr,
                 word: cWord,
-                cost,
                 compoundWord: word,
                 isPreferred: undefined,
             };
@@ -261,10 +270,11 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
         const nWordToMatch = wordToMatch.normalize(NF);
         const rawValues = [...sugs.values()];
         const values = weightMap
-            ? rawValues.map(({ word, cost, isPreferred }) => ({
-                  word,
-                  cost: isPreferred ? cost : editDistanceWeighted(nWordToMatch, word.normalize(NF), weightMap, 110),
-                  isPreferred,
+            ? rawValues.map((sug) => ({
+                  ...sug,
+                  cost: sug.isPreferred
+                      ? sug.cost
+                      : editDistanceWeighted(nWordToMatch, sug.word.normalize(NF), weightMap, 110),
               }))
             : rawValues;
 
@@ -315,11 +325,20 @@ export function suggestionCollector(wordToMatch: string, options: SuggestionColl
  * The collection is still in the original collector.
  * @param collector - collector to impersonate
  * @param word - word to present instead of `collector.word`.
+ * @param dictionaryLocale - the locale of the source dictionary, if known.
  * @returns a SuggestionCollector
  */
-export function impersonateCollector(collector: SuggestionCollector, word: string): SuggestionCollector {
+export function impersonateCollector(
+    collector: SuggestionCollector,
+    word: string,
+    dictionaryLocale?: string,
+): SuggestionCollector {
     const r = Object.create(collector);
     Object.defineProperty(r, 'word', { value: word, writable: false });
+    if (dictionaryLocale) {
+        r.collect = (src: SuggestionGenerator, timeout?: number, filter?: FilterWordFn) =>
+            collector.collect(src, timeout, filter, dictionaryLocale);
+    }
     return r;
 }
 

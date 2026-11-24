@@ -502,6 +502,34 @@ describe('docValidator suggestions', () => {
         expect(issues).toHaveLength(1);
         expect(issues[0].suggestionsEx).toMatchSnapshot();
     });
+
+    // cspell:ignore İnceleme İncelemee Innside
+    test('matches the dictionary locale in document suggestions', async () => {
+        const doc = td(__filename, 'İncelemee Innside', 'plaintext');
+        const dVal = new DocumentValidator(
+            doc,
+            { generateSuggestions: true, noConfigSearch: true },
+            {
+                language: 'en,tr',
+                loadDefaultConfiguration: false,
+                dictionaries: ['turkish', 'english'],
+                dictionaryDefinitions: [
+                    {
+                        name: 'turkish',
+                        path: path.join(pathPackageRoot, 'samples', 'turkish-words.txt'),
+                        dictionaryInformation: { locale: 'tr-TR' },
+                    },
+                    { name: 'english', words: ['inside'] },
+                ],
+            },
+        );
+
+        await dVal.prepare();
+        const issues = dVal.checkDocument();
+        expect(issues.map((issue) => issue.text)).toEqual(['İncelemee', 'Innside']);
+        expect(issues[0].suggestionsEx).toContainEqual(oc({ word: 'inceleme', wordAdjustedToMatchCase: 'İnceleme' }));
+        expect(issues[1].suggestionsEx).toContainEqual(oc({ word: 'inside', wordAdjustedToMatchCase: 'Inside' }));
+    });
 });
 
 function sampleCode() {

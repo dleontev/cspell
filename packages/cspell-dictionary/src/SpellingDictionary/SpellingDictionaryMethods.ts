@@ -54,11 +54,11 @@ export function wordSuggestFormsArray(word: string): string[] {
     return [...wordSuggestForms(word)];
 }
 
-export function wordSuggestForms(word: string): Set<string> {
+export function wordSuggestForms(word: string, locale?: string): Set<string> {
     word = word.normalize('NFC');
     const forms = new Set<string>([word]);
-    const wordLc = word.toLowerCase();
-    forms.add(wordLc);
+    if (locale) forms.add(word.toLocaleLowerCase(locale));
+    forms.add(word.toLowerCase());
     return forms;
 }
 

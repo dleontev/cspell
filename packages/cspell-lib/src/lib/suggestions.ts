@@ -219,7 +219,7 @@ async function _suggestionsForWordAsync(
         ignoreCase,
         extendsDictionaryCollection,
     );
-    const allSugs = sugsAdjusted.map((sug) => {
+    const allSugs = sugsAdjusted.map(({ dictionaryLocale: _dictionaryLocale, ...sug }) => {
         const found = extendsDictionaryCollection.find(sug.word);
         return {
             ...sug,
@@ -262,10 +262,10 @@ export function calcSuggestionAdjustedToToMatchCase<T extends SuggestionResult>(
 ): (T & WordSuggestion)[] {
     locale = normalizeLocaleForIntl(locale);
     const knownSugs = new Set(sugs.map((sug) => sug.word));
-    const matchStyle = { ...analyzeCase(originalWord), locale, ignoreCase };
+    const matchStyle = { ...analyzeCase(originalWord), ignoreCase };
     /* Add adjusted words */
     return sugs.map((sug) => {
-        const alt = matchCase(sug.word, !!sug.isPreferred, matchStyle);
+        const alt = matchCase(sug.word, !!sug.isPreferred, matchStyle, sug.dictionaryLocale ?? locale);
         if (alt === sug.word || knownSugs.has(alt)) return sug;
 
         const found = dict.find(alt);
@@ -302,8 +302,12 @@ function validateDictionaries(settings: CSpellSettings, dictionaries: string[] |
     }
 }
 
-function matchCase(word: string, isPreferred: boolean, style: CaseStyle): string {
-    const locale = style.locale;
+function matchCase(
+    word: string,
+    isPreferred: boolean,
+    style: CaseStyle,
+    locale: string | string[] | undefined,
+): string {
     if (style.isMixedCaps) {
         /**
          * Do not try matching mixed caps.
@@ -323,7 +327,6 @@ function matchCase(word: string, isPreferred: boolean, style: CaseStyle): string
 }
 
 interface CaseStyle extends AnalyzeCaseResult {
-    locale: string | string[] | undefined;
     ignoreCase: boolean;
 }
 

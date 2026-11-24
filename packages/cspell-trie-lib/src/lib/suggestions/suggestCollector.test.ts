@@ -46,6 +46,22 @@ describe('Validate suggestCollector', () => {
         expect(collector.suggestions[0].cost).toBe(75);
     });
 
+    test('keeps the locale of the lowest-cost source for a word', () => {
+        function* emit(cost: number): SuggestionGenerator {
+            yield { word: 'inside', cost };
+        }
+
+        const collector = suggestionCollector('Inside', defaultOptions);
+        impersonateCollector(collector, 'inside', 'tr-TR').collect(emit(100));
+        expect(collector.suggestions[0].dictionaryLocale).toBe('tr-TR');
+
+        impersonateCollector(collector, 'inside', 'en-US').collect(emit(75));
+        expect(collector.suggestions[0].dictionaryLocale).toBe('en-US');
+
+        collector.collect(emit(50));
+        expect(collector.suggestions[0]).not.toHaveProperty('dictionaryLocale');
+    });
+
     test('collect', () => {
         const spellResults = [
             { word: 'joyfuller', cost: 200 },

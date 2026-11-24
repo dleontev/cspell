@@ -1,3 +1,5 @@
+import { fileURLToPath } from 'node:url';
+
 import type { CSpellSettings } from '@cspell/cspell-types';
 import type { ICSpellConfigFile } from 'cspell-config-lib';
 import { describe, expect, test } from 'vitest';
@@ -50,6 +52,32 @@ describe('suggestions', () => {
             await expect(suggestionsForWord(word, options, settings)).rejects.toThrow(SuggestionError);
         },
     );
+
+    // cspell:ignore İnceleme İncelemee Innside
+    test('matches case using the dictionary locale for each suggestion', async () => {
+        const settings: CSpellSettings = {
+            language: 'en,tr',
+            dictionaries: ['turkish', 'english'],
+            dictionaryDefinitions: [
+                {
+                    name: 'turkish',
+                    path: fileURLToPath(new URL('../../samples/turkish-words.txt', import.meta.url)),
+                    dictionaryInformation: { locale: 'tr-TR' },
+                },
+                { name: 'english', words: ['inside'] },
+            ],
+        };
+        const options = { includeDefaultConfig: false };
+
+        const turkish = await suggestionsForWord('İncelemee', options, settings);
+        expect(turkish.suggestions).toContainEqual(
+            oc({ word: 'inceleme', wordAdjustedToMatchCase: 'İnceleme', dictionaries: ['turkish'] }),
+        );
+        const english = await suggestionsForWord('Innside', options, settings);
+        expect(english.suggestions).toContainEqual(
+            oc({ word: 'inside', wordAdjustedToMatchCase: 'Inside', dictionaries: ['english'] }),
+        );
+    });
 });
 
 describe('Suggestions English', async () => {
